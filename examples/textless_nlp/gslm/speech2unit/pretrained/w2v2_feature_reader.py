@@ -15,14 +15,9 @@ class Wav2VecFeatureReader:
     """
 
     def __init__(self, checkpoint_path, layer):
-        state = fairseq.checkpoint_utils.load_checkpoint_to_cpu(
-            checkpoint_path
-        )
-
-        w2v_args = state["args"]
-        self.task = fairseq.tasks.setup_task(w2v_args)
-        model = self.task.build_model(w2v_args)
-        model.load_state_dict(state["model"], strict=True)
+        model, cfg, task = fairseq.checkpoint_utils.load_model_ensemble_and_task([checkpoint_path])
+        self.task = task
+        model = model[0]
         model.eval()
         model.cuda()
         self.model = model
