@@ -14,8 +14,28 @@ from examples.textless_nlp.gslm.unit2speech.utils import (
     load_quantized_audio_from_file,
     load_tacotron,
 )
-from tacotron2.loss_function import Tacotron2Loss
 import torch
+
+
+from torch import nn
+
+
+class Tacotron2Loss(nn.Module):
+    def __init__(self):
+        super(Tacotron2Loss, self).__init__()
+
+    def forward(self, model_output, targets):
+        mel_target, gate_target = targets[0], targets[1]
+        mel_target.requires_grad = False
+        gate_target.requires_grad = False
+        gate_target = gate_target.view(-1, 1)
+
+        mel_out, mel_out_postnet, gate_out, _ = model_output
+        gate_out = gate_out.view(-1, 1)
+        mel_loss = nn.MSELoss()(mel_out, mel_target) + \
+                   nn.MSELoss()(mel_out_postnet, mel_target)
+        gate_loss = nn.BCEWithLogitsLoss()(gate_out, gate_target)
+        return mel_loss + gate_loss
 
 
 def get_logger():
@@ -47,7 +67,7 @@ def get_parser():
 def main(args, logger):
     # Load quantized audio
     logger.info(f"Loading quantized audio from {args.quantized_unit_path}...")
-    quantized_unit_files = [args.quantized_unit_path]
+    quantized_unit_file = args.quantized_unit_path
 
     logger.info(f"Loading TTS model from {args.tts_model_path}...")
     tacotron_model, sample_rate, hparams = load_tacotron(
@@ -72,17 +92,22 @@ def main(args, logger):
     # ================ MAIN TRAINING LOOP! ===================
     for epoch in range(epoch_offset, hparams.epochs):
         print("Epoch: {}".format(epoch))
-        for i, file in enumerate(quantized_unit_files):
+
+        names_batch, quantized_units_batch = load_quantized_audio_from_file(
+            file_path=quantized_unit_file
+        )
+
+        for name, quantized_units in zip(names_batch, quantized_units_batch):
+
             start = time.perf_counter()
             for param_group in optimizer.param_groups:
                 param_group["lr"] = learning_rate
 
-            names_batch, quantized_units_batch = load_quantized_audio_from_file(
-                file_path=file
-            )
+            quantized_units_str = " ".join(map(str, quantized_units))
+            tts_input = tts_dataset.get_tensor(quantized_units_str)
 
             tacotron_model.zero_grad()
-            x, y = tacotron_model.parse_batch(quantized_units_batch)
+            x, y = tacotron_model.parse_batch(tts_input)
             y_pred = tacotron_model(x)
 
             loss = criterion(y_pred, y)
