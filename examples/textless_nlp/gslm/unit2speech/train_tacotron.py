@@ -39,6 +39,7 @@ def get_parser():
         type=str,
         help="TTS model file path to use for inference",
     )
+    parser.add_argument("--max_decoder_steps", type=int, default=2000)
 
     return parser
 
