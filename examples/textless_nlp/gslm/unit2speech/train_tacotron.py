@@ -1,8 +1,3 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
-#
-# This source code is licensed under the MIT license found in the
-# LICENSE file in the root directory of this source tree.
-
 import argparse
 import logging
 import time
@@ -75,7 +70,7 @@ def main(args, logger):
         max_decoder_steps=args.max_decoder_steps,
     )
 
-    learning_rate = hparams.learning_rate
+    learning_rate = 1e-3
     optimizer = torch.optim.Adam(
         tacotron_model.parameters(), lr=learning_rate, weight_decay=hparams.weight_decay
     )
