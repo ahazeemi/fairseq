@@ -50,9 +50,9 @@ def get_parser():
         help="K-means model file path to use for inference",
     )
     parser.add_argument(
-        "--tts_model_path",
+        "--acoustic_model_path",
         type=str,
-        help="TTS model file path to use for inference",
+        help="Acoustic model file path to use for inference",
     )
     parser.add_argument("--max_decoder_steps", type=int, default=2000)
 
@@ -64,9 +64,9 @@ def main(args, logger):
     logger.info(f"Loading quantized audio from {args.quantized_unit_path}...")
     quantized_unit_file = args.quantized_unit_path
 
-    logger.info(f"Loading TTS model from {args.tts_model_path}...")
+    logger.info(f"Loading acoustic model from {args.acoustic_model_path}...")
     tacotron_model, sample_rate, hparams = load_tacotron(
-        tacotron_model_path=args.tts_model_path,
+        tacotron_model_path=args.acoustic_model_path,
         max_decoder_steps=args.max_decoder_steps,
     )
 
@@ -83,7 +83,7 @@ def main(args, logger):
 
     criterion = Tacotron2Loss()
 
-    tts_dataset = TacotronInputDataset(hparams)
+    tacotron_dataset = TacotronInputDataset(hparams)
     # ================ MAIN TRAINING LOOP! ===================
     for epoch in range(epoch_offset, hparams.epochs):
         print("Epoch: {}".format(epoch))
@@ -99,10 +99,10 @@ def main(args, logger):
                 param_group["lr"] = learning_rate
 
             quantized_units_str = " ".join(map(str, quantized_units))
-            tts_input = tts_dataset.get_tensor(quantized_units_str)
+            tacotron_input = tacotron_dataset.get_tensor(quantized_units_str)
 
             tacotron_model.zero_grad()
-            x, y = tacotron_model.parse_batch(tts_input)
+            x, y = tacotron_model.parse_batch(tacotron_input)
             y_pred = tacotron_model(x)
 
             loss = criterion(y_pred, y)
