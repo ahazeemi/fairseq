@@ -12,7 +12,7 @@ from examples.textless_nlp.gslm.unit2speech.utils import (
 import torch
 from scipy.io.wavfile import read
 import numpy as np
-from examples.textless_nlp.gslm.unit2speech.tacotron2 import layers
+from examples.textless_nlp.gslm.unit2speech.tacotron2 import layers, utils
 
 from torch import nn
 
@@ -35,9 +35,6 @@ class TextMelLoader():
 
     def get_mel(self, filename):
         audio, sampling_rate = load_wav_to_torch(filename)
-        if sampling_rate != self.stft.sampling_rate:
-            raise ValueError("{} {} SR doesn't match target {} SR".format(
-                sampling_rate, self.stft.sampling_rate))
         audio_norm = audio / self.max_wav_value
         audio_norm = audio_norm.unsqueeze(0)
         audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
@@ -131,12 +128,6 @@ class TextMelCollate():
             dim=0, descending=True)
         max_input_len = input_lengths[0]
 
-        text_padded = torch.LongTensor(len(batch), max_input_len)
-        text_padded.zero_()
-        for i in range(len(ids_sorted_decreasing)):
-            text = batch[ids_sorted_decreasing[i]][0]
-            text_padded[i, :text.size(0)] = text
-
         # Right zero-pad mel-spec
         num_mels = batch[0][1].size(0)
         max_target_len = max([x[1].size(1) for x in batch])
@@ -156,7 +147,7 @@ class TextMelCollate():
             gate_padded[i, mel.size(1)-1:] = 1
             output_lengths[i] = mel.size(1)
 
-        return text_padded, input_lengths, mel_padded, gate_padded, \
+        return 0, input_lengths, mel_padded, gate_padded, \
             output_lengths
 
 
@@ -197,28 +188,27 @@ def main(args, logger):
     batch = []
     for name, quantized_units in zip(names_batch, quantized_units_batch):
         quantized_units_str = " ".join(map(str, quantized_units))
-        mel = loader.get_mel(name)
+        mel = loader.get_mel('/content/justwavfiles/' + name)
         batch.append([quantized_units_str, mel])
 
-    training_batch = batch_processor.process_batch(batch)
+    _, mel_padded, gate_padded, _, _ = batch_processor.process_batch(batch)
 
     # ================ MAIN TRAINING LOOP! ===================
     for epoch in range(epoch_offset, hparams.epochs):
         print("Epoch: {}".format(epoch))
 
-        for name, quantized_units, training_data in zip(names_batch, quantized_units_batch, training_batch):
+        for name, quantized_units, mel, gate in zip(names_batch, quantized_units_batch, mel_padded, gate_padded):
 
             start = time.perf_counter()
             for param_group in optimizer.param_groups:
                 param_group["lr"] = learning_rate
 
             quantized_units_str = " ".join(map(str, quantized_units))
-            tacotron_input = tacotron_dataset.get_tensor(quantized_units_str)
+            tacotron_input = utils.to_gpu(tacotron_dataset.get_tensor(quantized_units_str))
 
             tacotron_model.zero_grad()
 
-            _, _, mel_padded, gate_padded, _ = training_data
-            y = [mel_padded, gate_padded]
+            y = [mel, gate]
 
             model_output = tacotron_model.inference(tacotron_input, None, ret_has_eos=False)
 
