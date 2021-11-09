@@ -53,6 +53,22 @@ class Tacotron2Loss(nn.Module):
         gate_target = gate_target.view(-1, 1)
 
         mel_out, mel_out_postnet, gate_out, _ = model_output
+
+        print('Mel target: ', mel_target.size())
+        print('Mel Out: ', mel_out.size())
+        print('Gate target: ', gate_target.size())
+        print('gate Out: ', gate_out.size())
+
+        while mel_out.size(1) < 2000:
+            mel_out += [0]
+
+        while mel_out_postnet.size(1) < 2000:
+            mel_out_postnet += [0]
+
+        while gate_out.size(0) < 2000:
+            gate_out.append(0)
+
+
         gate_out = gate_out.view(-1, 1)
         mel_loss = nn.MSELoss()(mel_out, mel_target) + \
                    nn.MSELoss()(mel_out_postnet, mel_target)
@@ -130,7 +146,8 @@ class TextMelCollate():
 
         # Right zero-pad mel-spec
         num_mels = batch[0][1].size(0)
-        max_target_len = max([x[1].size(1) for x in batch])
+        # max_target_len = max([x[1].size(1) for x in batch])
+        max_target_len = 2000
         if max_target_len % self.n_frames_per_step != 0:
             max_target_len += self.n_frames_per_step - max_target_len % self.n_frames_per_step
             assert max_target_len % self.n_frames_per_step == 0
