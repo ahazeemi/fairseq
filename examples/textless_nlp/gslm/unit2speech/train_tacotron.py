@@ -191,7 +191,7 @@ def main(args, logger):
         mel = loader.get_mel('/content/justwavfiles/' + name)
         batch.append([quantized_units_str, mel])
 
-    _, mel_padded, gate_padded, _, _ = batch_processor.process_batch(batch)
+    _, mel_padded, gate_padded, _, _ = batch_processor.process_batch(batch[:1])
 
     # ================ MAIN TRAINING LOOP! ===================
     for epoch in range(epoch_offset, hparams.epochs):
@@ -204,13 +204,13 @@ def main(args, logger):
                 param_group["lr"] = learning_rate
 
             quantized_units_str = " ".join(map(str, quantized_units))
-            tacotron_input = utils.to_gpu(tacotron_dataset.get_tensor(quantized_units_str))
+            tacotron_input = tacotron_dataset.get_tensor(quantized_units_str)
 
             tacotron_model.zero_grad()
 
-            y = [mel, gate]
+            y = torch.tensor([mel, gate]).cuda()
 
-            model_output = tacotron_model.inference(tacotron_input, None, ret_has_eos=False)
+            model_output = tacotron_model.inference(tacotron_input.unsqueeze(0).cuda(), None, ret_has_eos=False)
 
             loss = criterion(model_output, y)
 
