@@ -208,7 +208,7 @@ def main(args, logger):
 
             tacotron_model.zero_grad()
 
-            y = torch.tensor([mel, gate]).cuda()
+            y = [mel.cuda(), gate.cuda()]
 
             model_output = tacotron_model.inference(tacotron_input.unsqueeze(0).cuda(), None, ret_has_eos=False)
 
